@@ -1,23 +1,29 @@
 import type { OpenAPIV3 } from 'openapi-types';
 import type { Prop, PropValue } from './props2String';
 
-export const defKey2defName = (key: string) =>
-  `${key[0].replace(/^([^a-zA-Z$_])$/, '$$$1').toUpperCase()}${key
-    .slice(1)
-    .replace(/[^a-zA-Z0-9$_]/g, '_')}`;
-
-export const $ref2TypeName = (ref: string) => {
-  const [, , , typeName, , propName] = ref.split('/');
-  return { typeName, propName: propName || null };
+// ECMAScript identifiers allow Unicode letters, combining marks and joiners.
+export const defKey2defName = (key: string) => {
+  const [first = '_', ...rest] = Array.from(key);
+  const start = /^[$_\p{ID_Start}]$/u.test(first)
+    ? first.toUpperCase()
+    : `$${/^\p{ID_Continue}$/u.test(first) ? first : '_'}`;
+  return start + rest.map((c) => (/^[$\u200c\u200d\p{ID_Continue}]$/u.test(c) ? c : '_')).join('');
 };
 
-// $ref2Type: replace /Array$/ for Swagger 2.0
+export const decodePointer = (token: string) => token.replace(/~1/g, '/').replace(/~0/g, '~');
+export const encodePointer = (token: string) => token.replace(/~/g, '~0').replace(/\//g, '~1');
+
+export const $ref2TypeName = (ref: string) => {
+  const [, , , typeName, , propName] = decodeURIComponent(ref).split('/').map(decodePointer);
+  return { typeName, propName: propName ?? null };
+};
+
+export const quoteString = (value: string) =>
+  /['\\\r\n\u2028\u2029]/.test(value) ? JSON.stringify(value) : `'${value}'`;
+
 export const $ref2Type = (ref: string) => {
   const { typeName, propName } = $ref2TypeName(ref);
-  return `Types.${defKey2defName(typeName)}${propName ? `['${propName}']` : ''}`.replace(
-    /Array$/,
-    '[]',
-  );
+  return `Types.${defKey2defName(typeName)}${propName !== null ? `[${quoteString(propName)}]` : ''}`;
 };
 
 export const isRefObject = (
@@ -38,7 +44,7 @@ export const isObjectSchema = (
 ): schema is OpenAPIV3.NonArraySchemaObject => !isRefObject(schema) && schema.type !== 'array';
 
 export const getPropertyName = (name: string) =>
-  /^[a-zA-Z_$][0-9a-zA-Z_$]*$/.test(name) ? name : `'${name}'`;
+  /^[a-zA-Z_$][0-9a-zA-Z_$]*$/.test(name) ? name : quoteString(name);
 
 const of2Values = (obj: OpenAPIV3.SchemaObject): PropValue[] | null => {
   const values = (obj.oneOf || obj.allOf || obj.anyOf || [])

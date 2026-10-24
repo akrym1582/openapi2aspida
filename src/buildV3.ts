@@ -15,6 +15,7 @@ import requestBodies2Props from './builderUtils/requestBodies2Props';
 import { resolveParamsRef, resolveReqRef, resolveResRef } from './builderUtils/resolvers';
 import responses2Props from './builderUtils/responses2Props';
 import schemas2Props from './builderUtils/schemas2Props';
+import normalizeComponentNames from './normalizeComponentNames';
 
 const methodNames = ['get', 'post', 'put', 'delete', 'head', 'options', 'patch'] as const;
 
@@ -23,7 +24,8 @@ const getParamsList = (
   params?: (OpenAPIV3.ReferenceObject | OpenAPIV3.ParameterObject)[],
 ) => params?.map((p) => (isRefObject(p) ? resolveParamsRef(openapi, p.$ref) : p)) || [];
 
-export default (openapi: OpenAPIV3.Document) => {
+export default (document: OpenAPIV3.Document) => {
+  const openapi = normalizeComponentNames(document);
   const files: { file: string[]; methods: string }[] = [];
   const schemas = schemas2Props(openapi.components?.schemas, openapi) || [];
   const parameters = parameters2Props(openapi.components?.parameters, openapi) || [];
