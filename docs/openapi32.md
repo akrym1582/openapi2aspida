@@ -22,7 +22,10 @@ full document validation step, just as before.
 | Japanese component names, local references and name collisions | See [component names](unicode-names.md) |
 | Local external-file references to Japanese schemas | Resolved before schema adaptation and name allocation |
 | `type: [string, null]`, other type arrays, nullable objects and array items | TypeScript unions |
-| Primitive `const`, mixed primitive `enum` | Literal types, with escaped strings |
+| Primitive, object and array `const`; mixed primitive `enum` | Nested literal types and tuples; const/enum equality ignores object key order; contradictory const/enum or enum/type combinations become `never` |
+| `prefixItems` with `type: array` | Tuples with optional prefixes, typed/open/closed tails and min/max lengths |
+| `$defs`, static `$id` and `$anchor`, schema JSON Pointers | Resource-aware references, promoted to named components |
+| 3.2 `$self` | Base URI for relative document references and remote root server URLs |
 | `true`, `false`, empty schema; array without `items` | `unknown`, `never`, `unknown`; `unknown[]` |
 | Schema `$ref` siblings | Intersection with the referenced type |
 | Nested union/intersection composition | Parentheses preserve intersection precedence |
@@ -38,14 +41,14 @@ as a deliberate generator extension, not a change to that standard.
 For 3.1/3.2 input, the following detected features raise an error with the document
 location instead of silently producing an incomplete client:
 
-- `$self`, webhooks, `query` and `trace` operations, `additionalOperations`.
+- Webhooks, `query` and `trace` operations, `additionalOperations`.
   aspida 1.14's method union only supports the seven methods above.
 - `in: querystring`, streaming media `itemSchema`.
-- `$id`, `$anchor`, `$dynamicAnchor`, `$dynamicRef`, `$defs`, local schema refs
-  outside `components/schemas`, and custom JSON Schema dialects.
-- `prefixItems`, `unevaluatedProperties`, `unevaluatedItems`, `if` / `then` / `else`,
+- `$dynamicAnchor`, `$dynamicRef`, and custom JSON Schema dialects.
+- `unevaluatedProperties`, `unevaluatedItems`, `if` / `then` / `else`,
   `contains`, `dependentSchemas`, `patternProperties`, and `not`.
-- Object/array `const` and contradictory `const`/`enum` combinations.
+- `prefixItems` without an explicit array type (or an array member of a type union),
+  tuple length bounds above 1000, and cycles consisting only of schema aliases.
 
 These checks are not an exhaustive validator. Existing generator limitations
 remain: runtime constraints (e.g. bounds, patterns and formats) are not validated;
@@ -54,8 +57,42 @@ such as `additionalProperties: false` are not generally expressible in TypeScrip
 Cookie parameters, advanced serialization/encoding, callbacks, security schemes,
 Path Item references, status ranges and path/operation server overrides have not
 been expanded here. Authentication and transport setup remain the application's
-responsibility. External resolution retains the original resolver's limitations
-(including nontrivial URI bases and anchors); the added tests cover local files.
+responsibility. Work on features already unsupported in 3.0 is outside this fork
+iteration's scope; the legacy 2.0/3.0 reference resolver remains unchanged.
+
+## Modern schema references and tuples
+
+For 3.1/3.2 only, a separate static resolver indexes schema resources before
+rendering. `$id` establishes a new base URI and JSON Pointer root; `$anchor` is
+scoped to that resource. Retrieval URIs remain aliases of canonical identifiers.
+The 3.2 document `$self` supplies the document base, including when the document
+was downloaded under another URI. Relative local files and HTTP(S) documents use
+the same URI rules; HTTP loading and caching are tested with mocked retrieval.
+Live HTTP redirects, authentication and alternate dialect behavior are not covered.
+
+References into `$defs` and nested schemas are promoted to generated components,
+then pass through the same Unicode/collision allocator as ordinary schema names.
+Existing component names are reserved. Repeated targets reuse one generated type;
+recursive object/array schemas keep named references instead of infinite expansion.
+Missing pointers/anchors, duplicate identifiers and pure alias cycles fail with
+diagnostics. Examples, defaults and literal const/enum values are never traversed
+as schema references. Unreferenced `$defs` are indexed but not exported.
+Generated helper names are internal: reordering external references can change
+external numbering, so prefer importing the original named components.
+
+`prefixItems` does **not** imply all tuple elements are required. For example,
+`prefixItems: [{type: string}, {type: number}], items: false` produces optional
+slots; add `minItems: 2` for `[string, number]`. Omitting `items` permits an
+`unknown[]` tail. Typed tails, `items: false`, false prefix schemas and min/max
+lengths are tested with valid and invalid TypeScript assignments. Expansion of
+length bounds is capped at 1000 to avoid generating excessive source. As elsewhere,
+these are compile-time types, not runtime JSON validators; optional tuple elements
+can admit JavaScript `undefined`, which is not a JSON value.
+
+Structured const values become structural TypeScript literal types. They enforce
+required members and literal values, but do not impose exact-object semantics on
+variables with additional properties. Tests also cover const values containing
+`$ref`, `$id`, `Types.` and other text that must remain literal data.
 
 ## aspida and SWR
 
@@ -63,7 +100,8 @@ No runtime dependency on SWR or React was added. They are development dependenci
 for the compatibility test. `tests/aspida-swr.spec.ts` generates a real client,
 compiles normal `useAspidaSWR(client.customers, { query: ... })` usage with
 `@aspida/swr` 1.14 and SWR 2, and verifies response inference and rejected invalid
-query arguments. It executes `$get`, `$path` and SWR's real default-key helper with
+query arguments, including tuple/structured-const response fields reached through
+`$defs` and `$id`. It executes `$get`, `$path` and SWR's real default-key helper with
 a mock transport. It does not test React rendering or a live backend.
 
 Changes to exported Japanese or colliding type names require updating explicit

@@ -23,7 +23,20 @@ test('generated 3.2 client keeps aspida and SWR typing and runtime contract', as
             顧客情報: {
               type: 'object',
               required: ['名前'],
-              properties: { 名前: { type: 'string' } },
+              $id: 'https://schemas.example/customer',
+              $defs: {
+                Coordinates: {
+                  type: 'array',
+                  prefixItems: [{ type: 'number' }, { type: 'number' }],
+                  items: false,
+                  minItems: 2,
+                },
+              },
+              properties: {
+                名前: { type: 'string' },
+                座標: { $ref: '#/$defs/Coordinates' },
+                種類: { const: { kind: 'customer' } },
+              },
             },
           },
         },
@@ -44,7 +57,7 @@ test('generated 3.2 client keeps aspida and SWR typing and runtime contract', as
             },
           },
         },
-      },
+      } as any,
       isYaml: false,
       output: outputDir,
     });
@@ -66,6 +79,10 @@ declare const transport: AspidaClient<{}>;
 const client = api(transport);
 const response = useAspidaSWR(client.customers, { query: { limit: 10 } });
 const customer: 顧客情報 | undefined = response.data;
+const coordinates: [number, number] | undefined = response.data?.座標;
+const kind: 'customer' | undefined = response.data?.種類?.kind;
+// @ts-expect-error tuple length survives references and SWR inference
+const incorrectCoordinates: [number] | undefined = response.data?.座標;
 // @ts-expect-error required query is still enforced
 useAspidaSWR(client.customers);
 // @ts-expect-error numeric query type is still enforced
@@ -90,7 +107,7 @@ const wrong: number | undefined = response.data;
     program.emit();
     const factory = require(path.join(dir, 'js/api/$api.js')).default;
     const calls: unknown[] = [];
-    const customer = { 名前: '田中' };
+    const customer = { 名前: '田中', 座標: [139.7, 35.7], 種類: { kind: 'customer' } };
     const client = factory({
       baseURL: 'https://example.com',
       fetch: (...args: unknown[]) => {
