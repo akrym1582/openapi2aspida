@@ -15,6 +15,7 @@ import requestBodies2Props from './builderUtils/requestBodies2Props';
 import { resolveParamsRef, resolveReqRef, resolveResRef } from './builderUtils/resolvers';
 import responses2Props from './builderUtils/responses2Props';
 import schemas2Props from './builderUtils/schemas2Props';
+import normalizeComponentNames from './normalizeComponentNames';
 
 const methodNames = ['get', 'post', 'put', 'delete', 'head', 'options', 'patch'] as const;
 
@@ -23,7 +24,8 @@ const getParamsList = (
   params?: (OpenAPIV3.ReferenceObject | OpenAPIV3.ParameterObject)[],
 ) => params?.map((p) => (isRefObject(p) ? resolveParamsRef(openapi, p.$ref) : p)) || [];
 
-export default (openapi: OpenAPIV3.Document) => {
+export default (document: OpenAPIV3.Document) => {
+  const openapi = normalizeComponentNames(document);
   const files: { file: string[]; methods: string }[] = [];
   const schemas = schemas2Props(openapi.components?.schemas, openapi) || [];
   const parameters = parameters2Props(openapi.components?.parameters, openapi) || [];
@@ -201,7 +203,7 @@ export default (openapi: OpenAPIV3.Document) => {
                     )?.[1]) ??
                   ref.content?.[Object.keys(ref.content)[0]];
 
-                if (content?.schema) {
+                if (content && content.schema !== undefined) {
                   const val = schema2value(content.schema, true);
 
                   if (val !== null) {
@@ -302,7 +304,8 @@ export default (openapi: OpenAPIV3.Document) => {
                       key.startsWith('application/'),
                     )?.[1];
 
-                  if (content?.schema) reqBody = schema2value(content.schema);
+                  if (content && content.schema !== undefined)
+                    reqBody = schema2value(content.schema);
                 }
               }
 
@@ -412,8 +415,14 @@ export default (openapi: OpenAPIV3.Document) => {
         ]
           .map((p) => `\n${description2Doc(p.description, '')}export type ${p.name} = ${p.text}\n`)
           .join('')
-          .replace(/(\W)Types\./g, '$1')
-          .replace(/\]\?:/g, ']:')
+          .replace(
+            /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\/\*[\s\S]*?\*\/)|\bTypes\./g,
+            (_match, literal) => literal ?? '',
+          )
+          .replace(
+            /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\/\*[\s\S]*?\*\/)|\]\?:/g,
+            (_match, literal) => literal ?? ']:',
+          )
       : null;
 
   return {

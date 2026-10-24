@@ -31,6 +31,7 @@
     "swagger"
   ],
   "dependencies": {
+    "@apidevtools/json-schema-ref-parser": "^9.1.2",
     "@apidevtools/swagger-parser": "^10.1.0",
     "aspida": "^1.14.0",
     "js-yaml": "^4.1.0",
@@ -38,14 +39,19 @@
     "swagger2openapi": "^7.0.8"
   },
   "devDependencies": {
+    "@aspida/swr": "^1.14.0",
     "@types/js-yaml": "^4.0.9",
     "@types/minimist": "^1.2.5",
+    "@types/node": "20.4.6",
+    "@types/react": "^18.3.31",
     "eslint": "^9.9.0",
     "eslint-config-flat-gitignore": "^0.1.8",
     "eslint-config-prettier": "^9.1.0",
     "minimist": "^1.2.8",
     "prettier": "^3.3.3",
     "prettier-plugin-organize-imports": "^4.0.0",
+    "react": "^18.3.1",
+    "swr": "^2.5.1",
     "typescript": "^5.5.4",
     "typescript-eslint": "^8.1.0",
     "vitest": "^2.0.5"

@@ -35,7 +35,13 @@ export const value2String = (v: PropValue, indent: string): string =>
 
 const values2String = (values: PropValue[], hasOf: PropValue['hasOf'], indent: string) =>
   values
-    .map((a) => value2String(a, indent))
+    .map((a) => {
+      const text = value2String(a, indent);
+      return hasOf === 'allOf' &&
+        (a.hasOf === 'anyOf' || a.hasOf === 'oneOf' || a.nullable || a.isEnum)
+        ? `(${text})`
+        : text;
+    })
     .join(hasOf === 'oneOf' || hasOf === 'anyOf' ? ' | ' : ' & ');
 
 const isMultiLine = (values: PropValue[]) =>
