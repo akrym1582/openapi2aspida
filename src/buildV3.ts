@@ -203,7 +203,7 @@ export default (document: OpenAPIV3.Document) => {
                     )?.[1]) ??
                   ref.content?.[Object.keys(ref.content)[0]];
 
-                if (content?.schema) {
+                if (content && content.schema !== undefined) {
                   const val = schema2value(content.schema, true);
 
                   if (val !== null) {
@@ -304,7 +304,8 @@ export default (document: OpenAPIV3.Document) => {
                       key.startsWith('application/'),
                     )?.[1];
 
-                  if (content?.schema) reqBody = schema2value(content.schema);
+                  if (content && content.schema !== undefined)
+                    reqBody = schema2value(content.schema);
                 }
               }
 

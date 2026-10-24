@@ -1,38 +1,7 @@
-import fs from 'fs';
-import type { OpenAPIV3 } from 'openapi-types';
-import os from 'os';
-import path from 'path';
-import ts from 'typescript';
 import { expect, test } from 'vitest';
 import buildV3 from '../src/buildV3';
 import { $ref2Type, defKey2defName } from '../src/builderUtils/converters';
-
-export const document = (schemas: OpenAPIV3.ComponentsObject['schemas']): OpenAPIV3.Document => ({
-  openapi: '3.0.3',
-  info: { title: 'Test', version: '1' },
-  paths: {},
-  components: { schemas },
-});
-
-export function checkTypes(source: string) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'openapi-types-'));
-  try {
-    const file = path.join(dir, 'types.ts');
-    fs.writeFileSync(file, source);
-    const program = ts.createProgram([file], {
-      strict: true,
-      noEmit: true,
-      target: ts.ScriptTarget.ES2022,
-    });
-    expect(
-      ts
-        .getPreEmitDiagnostics(program)
-        .map((d) => ts.flattenDiagnosticMessageText(d.messageText, '\n')),
-    ).toEqual([]);
-  } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
-  }
-}
+import { checkTypes, document } from './helpers';
 
 test('Japanese, Unicode and invalid names produce legal identifiers', () => {
   expect(defKey2defName('顧客情報')).toBe('顧客情報');

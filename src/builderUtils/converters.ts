@@ -34,7 +34,8 @@ export const isRefObject = (
     | OpenAPIV3.HeaderObject
     | OpenAPIV3.ParameterObject
     | OpenAPIV3.SchemaObject,
-): params is OpenAPIV3.ReferenceObject => '$ref' in params;
+): params is OpenAPIV3.ReferenceObject =>
+  !!params && typeof params === 'object' && '$ref' in params;
 
 const isArraySchema = (schema: OpenAPIV3.SchemaObject): schema is OpenAPIV3.ArraySchemaObject =>
   schema.type === 'array';
@@ -102,9 +103,17 @@ const object2value = (obj: OpenAPIV3.NonArraySchemaObject): Prop[] => {
 export const BINARY_TYPE = '(File | ReadStream)';
 
 export const schema2value = (
-  schema: OpenAPIV3.ReferenceObject | OpenAPIV3.SchemaObject | undefined,
+  schema: OpenAPIV3.ReferenceObject | OpenAPIV3.SchemaObject | boolean | undefined,
   isResponse?: true,
 ): PropValue | null => {
+  if (typeof schema === 'boolean')
+    return {
+      isArray: false,
+      isEnum: false,
+      nullable: false,
+      description: null,
+      value: schema ? 'unknown' : 'never',
+    };
   if (!schema) return null;
 
   let isArray = false;
@@ -125,7 +134,7 @@ export const schema2value = (
       value = of2Values(schema);
     } else if (schema.enum) {
       isEnum = true;
-      value = schema.type === 'string' ? schema.enum.map((e) => `'${e}'`) : schema.enum;
+      value = schema.enum.map((e) => (typeof e === 'string' ? quoteString(e) : JSON.stringify(e)));
     } else if (isArraySchema(schema)) {
       isArray = true;
       value = schema2value(schema.items);
