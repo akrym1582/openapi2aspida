@@ -146,10 +146,6 @@ test.each([
       },
     },
   ],
-  [
-    'prefixItems',
-    { components: { schemas: { Tuple: { type: 'array', prefixItems: [{ type: 'string' }] } } } },
-  ],
   ['$dynamicRef', { components: { schemas: { Dynamic: { $dynamicRef: '#node' } } } }],
   ['custom jsonSchemaDialect', { jsonSchemaDialect: 'https://example.com/custom' }],
 ])('rejects unsupported %s with a location', async (feature, extension) => {

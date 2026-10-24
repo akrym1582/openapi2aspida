@@ -415,8 +415,14 @@ export default (document: OpenAPIV3.Document) => {
         ]
           .map((p) => `\n${description2Doc(p.description, '')}export type ${p.name} = ${p.text}\n`)
           .join('')
-          .replace(/(\W)Types\./g, '$1')
-          .replace(/\]\?:/g, ']:')
+          .replace(
+            /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\/\*[\s\S]*?\*\/)|\bTypes\./g,
+            (_match, literal) => literal ?? '',
+          )
+          .replace(
+            /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\/\*[\s\S]*?\*\/)|\]\?:/g,
+            (_match, literal) => literal ?? ']:',
+          )
       : null;
 
   return {

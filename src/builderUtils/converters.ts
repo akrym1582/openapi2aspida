@@ -1,5 +1,6 @@
 import type { OpenAPIV3 } from 'openapi-types';
 import type { Prop, PropValue } from './props2String';
+import { value2String } from './props2String';
 
 // ECMAScript identifiers allow Unicode letters, combining marks and joiners.
 export const defKey2defName = (key: string) => {
@@ -135,6 +136,48 @@ export const schema2value = (
     } else if (schema.enum) {
       isEnum = true;
       value = schema.enum.map((e) => (typeof e === 'string' ? quoteString(e) : JSON.stringify(e)));
+    } else if ('prefixItems' in schema && Array.isArray(schema.prefixItems)) {
+      const tuple = schema as OpenAPIV3.ArraySchemaObject & {
+        prefixItems: (OpenAPIV3.SchemaObject | OpenAPIV3.ReferenceObject | boolean)[];
+      };
+      const min = tuple.minItems ?? 0;
+      const max = tuple.maxItems ?? Infinity;
+      if (
+        !Number.isInteger(min) ||
+        min < 0 ||
+        (max !== Infinity && (!Number.isInteger(max) || max < 0))
+      )
+        throw new Error('Invalid tuple length bounds');
+      // Avoid unbounded source expansion from huge minItems/maxItems values.
+      if (min > 1000 || (max !== Infinity && max > 1000))
+        throw new Error('Tuple length bounds above 1000 are unsupported');
+      const count = Math.min(tuple.prefixItems.length, max);
+      const parts: string[] = [];
+      let impossible = min > max;
+      for (let index = 0; index < count; index++) {
+        const item = tuple.prefixItems[index];
+        if (item === false) {
+          impossible ||= index < min;
+          break;
+        }
+        const text = value2String(schema2value(item, isResponse)!, '');
+        parts.push(index < min ? text : `(${text})?`);
+      }
+      const stopped = parts.length < count;
+      const rest = schema2value(tuple.items ?? true, isResponse)!;
+      if (!stopped) {
+        if ((tuple.items as unknown) === false && min > count) impossible = true;
+        else {
+          for (let index = count; index < Math.max(min, max === Infinity ? count : max); index++) {
+            if ((tuple.items as unknown) === false) break;
+            const text = value2String(rest, '');
+            parts.push(index < min ? text : `(${text})?`);
+          }
+          if (max === Infinity && (tuple.items as unknown) !== false)
+            parts.push(`...(${value2String(rest, '')})[]`);
+        }
+      }
+      value = impossible ? 'never' : `[${parts.join(', ')}]`;
     } else if (isArraySchema(schema)) {
       isArray = true;
       value = schema2value(schema.items);

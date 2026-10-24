@@ -15,7 +15,6 @@ export default (document: Record<string, any>): OpenAPIV3.Document => {
       '$dynamicAnchor',
       '$dynamicRef',
       '$defs',
-      'prefixItems',
       'unevaluatedProperties',
       'unevaluatedItems',
       'if',
@@ -56,20 +55,28 @@ export default (document: Record<string, any>): OpenAPIV3.Document => {
         result[key] = schema(result[key], `${location}/${key}`);
       }
     }
-    for (const key of ['allOf', 'anyOf', 'oneOf']) {
+    for (const key of ['allOf', 'anyOf', 'oneOf', 'prefixItems']) {
       if (result[key])
         result[key] = result[key].map((child: any, index: number) =>
           schema(child, `${location}/${key}/${index}`),
         );
     }
     if ('const' in result) {
-      if (result.const !== null && typeof result.const === 'object')
-        unsupported(location, 'object/array const');
+      const canonical = (value: any): string =>
+        JSON.stringify(value, (_key, child) =>
+          child && typeof child === 'object' && !Array.isArray(child)
+            ? Object.fromEntries(
+                Object.keys(child)
+                  .sort()
+                  .map((key) => [key, child[key]]),
+              )
+            : child,
+        );
       result.enum = result.enum
-        ? result.enum.filter((v: unknown) => v === result.const)
+        ? result.enum.filter((v: unknown) => canonical(v) === canonical(result.const))
         : [result.const];
-      if (!result.enum.length) unsupported(location, 'unsatisfiable const/enum');
       delete result.const;
+      if (!result.enum.length) return false;
     }
     if (Array.isArray(result.type)) {
       const types = result.type;
@@ -82,11 +89,32 @@ export default (document: Record<string, any>): OpenAPIV3.Document => {
             delete member.properties;
             delete member.additionalProperties;
           }
-          if (type !== 'array') delete member.items;
+          if (type !== 'array') {
+            delete member.items;
+            delete member.prefixItems;
+          }
           return schema(member, location);
         }),
         description: result.description,
       };
+    }
+    if (result.enum && typeof result.type === 'string') {
+      result.enum = result.enum.filter((v: any) =>
+        result.type === 'null'
+          ? v === null
+          : result.type === 'integer'
+            ? typeof v === 'number' && Number.isInteger(v)
+            : result.type === 'array'
+              ? Array.isArray(v)
+              : result.type === 'object'
+                ? v !== null && typeof v === 'object' && !Array.isArray(v)
+                : typeof v === result.type,
+      );
+      if (!result.enum.length) return false;
+    }
+    if (result.prefixItems && result.type !== 'array') {
+      if (result.type) delete result.prefixItems;
+      else unsupported(location, 'prefixItems without type: array');
     }
     if (
       result.$ref &&
@@ -94,6 +122,16 @@ export default (document: Record<string, any>): OpenAPIV3.Document => {
     ) {
       const { $ref, ...siblings } = result;
       return { allOf: [{ $ref }, siblings], description: siblings.description };
+    }
+    if (
+      result.enum &&
+      ['properties', 'additionalProperties', 'items', 'prefixItems'].some((key) => key in result)
+    ) {
+      const { enum: values, ...constraints } = result;
+      return {
+        allOf: [{ enum: values }, schema(constraints, location)],
+        description: result.description,
+      };
     }
     const compositions = ['allOf', 'anyOf', 'oneOf'].filter((key) => key in result);
     if (
