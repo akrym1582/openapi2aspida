@@ -23,6 +23,14 @@
 <br />
 <br />
 
+## Fork compatibility
+
+This fork preserves Unicode/Japanese component names and adds **partial OpenAPI
+3.1/3.2 support** while retaining the existing aspida client interface. See the
+[support matrix, limitations and fork installation instructions](docs/openapi32.md)
+and [component naming rules](docs/unicode-names.md). The npm release linked above
+is the upstream package and does not contain these fork changes.
+
 ## Getting Started
 
 Compatible with yaml/json of OpenAPI3.0/Swagger2.0
