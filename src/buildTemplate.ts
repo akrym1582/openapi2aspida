@@ -5,6 +5,7 @@ import buildV3 from './buildV3';
 import type { Config } from './getConfig';
 import normalizeOpenAPI31 from './normalizeOpenAPI31';
 import resolveExternalRefs from './resolveExternalRefs';
+import resolveModernRefs from './resolveModernRefs';
 
 const isV3 = (openapi: OpenAPI.Document): openapi is OpenAPIV3.Document => 'openapi' in openapi;
 
@@ -22,14 +23,12 @@ export default async ({ input, isYaml }: Config) => {
         'Invalid OpenAPI document: info and paths, components or webhooks are required',
       );
     }
-    // Fail before resolving external references whose base URI semantics we do not support.
-    normalizeOpenAPI31(document);
-    const resolved = await resolveExternalRefs(document, typeof input === 'string' ? input : '');
-    const normalized = normalizeOpenAPI31(resolved);
+    const resolved = await resolveModernRefs(document, typeof input === 'string' ? input : '');
+    const normalized = normalizeOpenAPI31(resolved.document);
     if (typeof input === 'string' && /^https?:\/\//.test(input)) {
       normalized.servers = normalized.servers?.map((server) => ({
         ...server,
-        url: new URL(server.url, input).href,
+        url: new URL(server.url, resolved.baseURI).href,
       }));
     }
     return buildV3(normalized);

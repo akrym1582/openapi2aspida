@@ -117,7 +117,6 @@ test('components-only documents and false response bodies', async () => {
 });
 
 test.each([
-  ['$self', { $self: 'https://example.com/api' }],
   ['webhooks', { webhooks: {} }],
   ['additionalOperations', { paths: { '/x': { additionalOperations: { COPY: {} } } } }],
   ['query', { paths: { '/x': { query: {} } } }],
